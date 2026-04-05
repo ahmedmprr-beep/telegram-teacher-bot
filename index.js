@@ -2,8 +2,6 @@ require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
 const fs = require('fs');
-const OpenAI = require('openai');
-
 const app = express();
 app.use(express.json());
 
@@ -11,15 +9,7 @@ const PORT = process.env.PORT || 3000;
 const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const WEBHOOK_URL = process.env.WEBHOOK_URL; // Required for Telegram webhook setup (e.g., your Railway app URL)
 const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_TOKEN}`;
-
-const openai = new OpenAI({
-  baseURL: "https://openrouter.ai/api/v1",
-  apiKey: process.env.OPENROUTER_API_KEY,
-  defaultHeaders: {
-    "HTTP-Referer": "https://railway.app", // Optional
-    "X-Title": "Teacher AI Bot", // Optional
-  }
-});
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
 // Load Users Database (Simple JSON file for this example)
 const USERS_FILE = './users.json';
@@ -36,18 +26,29 @@ function saveUsers() {
 
 // Teacher Configuration
 const SYSTEM_PROMPT = `
-You are Mr. Ahmed Hassan, a friendly Mathematics teacher with 10 years of experience.
-Your teaching style is friendly, simple, and you use examples to explain concepts.
-Your Schedule:
-- Sunday: 6 PM - 9 PM
-- Tuesday: 6 PM - 9 PM
-- Thursday: 6 PM - 9 PM
+أنت الآن تعمل كسكرتير مساعد (Teacher Assistant) لمستر أحمد حسن، مدرس الرياضيات.
+دورك هو مساعدة الطلاب، الرد على أسئلتهم البسيطة، تنظيم المواعيد، وتوجيههم، ولست المدرس نفسه.
 
-Rules:
-1. Be polite and friendly.
-2. Answer like a human teacher, not a robot.
-3. If a question is "خارج المنهج" (out of scope), politely guide the student back to math, but do not give wrong information.
-4. Keep answers concise for a chat interface.
+معلومات مستر أحمد حسن (أستاذ المادة):
+- المادة: رياضيات
+- الخبرة: 10 سنين
+- أسلوب الشرح: بسيط وبيشرح بالراحة
+
+مواعيد الحصص المتاحة:
+- الأحد: 6 مساءً - 9 مساءً
+- الثلاثاء: 6 مساءً - 9 مساءً
+- الخميس: 6 مساءً - 9 مساءً
+
+قواعد هامة جداً (يجب الالتزام بها حرفياً):
+1. الرد دائمًا باللغة العربية (عامية مصرية) فقط. ممنوع تماماً التحدث باللغة الإنجليزية أو الفصحى المعقدة.
+2. كن ودوداً، لطيفاً، طبيعياً جداً كأنك إنسان حقيقي مش روبوت.
+3. لا تقفز للإجابة مباشرة. إذا بدأ الطالب بسلام (مثل: السلام عليكم، إزيك) رد عليه التحية بشكل ودود واطلب منه كيف يمكنك مساعدته (مثال: "وعليكم السلام، أهلاً بيك يا بطل 😊 اقدر اساعدك إزاي؟").
+4. إذا سأل الطالب عن المواعيد → اذكر له الأيام والأوقات المتاحة.
+5. إذا سأل سؤالاً رياضياً → حاول مساعدته ببساطة وبطريقة سهلة زي المدرس.
+6. إذا كان السؤال غير واضح → اطلب منه توضيح سؤاله.
+7. إذا كان السؤال "خارج المنهج" → قوله بشكل لطيف إن ده مش ضمن المنهج أو الشرح وحاول ترجعه للمادة.
+8. استخدم اسم الطالب لو متاح لكسر الحاجز بينكم.
+9. خلي إجاباتك قصيرة ومناسبة للمحادثات (Chat).
 `.trim();
 
 // Setup Webhook Route
@@ -76,7 +77,7 @@ async function handleIncomingMessage(chatId, text) {
       history: []
     };
     saveUsers();
-    await sendMessage(chatId, "Welcome! I am Mr. Ahmed Hassan, your Mathematics teacher. 👋\nBefore we start, could you please tell me your name?");
+    await sendMessage(chatId, "أهلاً بيك! معاك سكرتارية مستر أحمد حسن، مدرس الرياضيات. 👋\nعشان أقدر أساعدك، ممكن تقولي اسمك إيه؟");
     return;
   }
 
@@ -87,7 +88,7 @@ async function handleIncomingMessage(chatId, text) {
     user.name = text;
     user.state = 'WAITING_FOR_PHONE';
     saveUsers();
-    await sendMessage(chatId, `Nice to meet you, ${user.name}! Could you please share your phone number?`);
+    await sendMessage(chatId, `طبعاً يا ${user.name}، فرصة سعيدة! ممكن تكتب لي رقم تليفونك؟`);
     return;
   }
 
@@ -95,7 +96,7 @@ async function handleIncomingMessage(chatId, text) {
     user.phone = text;
     user.state = 'WAITING_FOR_GENDER';
     saveUsers();
-    await sendMessage(chatId, "Great! Almost done. Are you Male or Female? (M/F)");
+    await sendMessage(chatId, "عاش جداً! آخر حاجة عشان نسجلك صح.. أنت طالب ولا طالبة؟ (ولد/بنت)");
     return;
   }
 
@@ -103,7 +104,7 @@ async function handleIncomingMessage(chatId, text) {
     user.gender = text;
     user.state = 'REGISTERED';
     saveUsers();
-    await sendMessage(chatId, `Thank you for registering, ${user.name}! Registration complete.\nHow can I help you with Mathematics today?`);
+    await sendMessage(chatId, `تم التسجيل بنجاح يا ${user.name}! نورتنا. 😊\nأقدر أساعدك إزاي النهاردة؟`);
     return;
   }
 
@@ -139,15 +140,22 @@ async function getOpenAIResponse(studentName, history) {
   ];
 
   try {
-    const response = await openai.chat.completions.create({
-      model: "meta-llama/llama-3-8b-instruct:free", // Using a free high-quality OpenRouter model
+    const response = await axios.post("https://openrouter.ai/api/v1/chat/completions", {
+      model: "meta-llama/llama-3-8b-instruct:free",
       messages: messages,
       temperature: 0.7,
+    }, {
+      headers: {
+        "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+        "HTTP-Referer": "https://railway.app",
+        "X-Title": "Teacher AI Bot",
+        "Content-Type": "application/json"
+      }
     });
 
-    return response.choices[0].message.content;
+    return response.data.choices[0].message.content;
   } catch (error) {
-    console.error("OpenAI API Error:", error);
+    console.error("OpenRouter API Error:", error.response ? JSON.stringify(error.response.data) : error.message);
     return "أعتذر يا بني، أواجه مشكلة بسيطة في التركيز الآن. هل يمكنك إعادة سؤالك لاحقًا؟";
   }
 }
@@ -184,3 +192,4 @@ app.listen(PORT, () => {
   console.log(`Teacher Bot Server running on port ${PORT}`);
   console.log(`Make sure TELEGRAM_BOT_TOKEN and OPENROUTER_API_KEY are matched in .env`);
 });
+
