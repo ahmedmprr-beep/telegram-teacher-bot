@@ -57,3 +57,4 @@ This bot is fully prepared for deployment on [Railway.app](https://railway.app/)
 - `package.json`: Project metadata and dependencies.
 - `users.json`: Simple file-based mock database for registering users and keeping chat history.
 - `.env.example`: Template for environment variables.
+
